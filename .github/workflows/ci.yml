@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || (gofmt -d .; exit 1)
+      - name: go vet
+        run: go vet ./...
+      - name: go test
+        run: go test ./...
+      - name: go build
+        run: go build ./...
+      - name: CLI smoke
+        run: |
+          go run . --list-hw
+          go run . --hw m4-pro --model 8b
+          go run . --hw rtx-4090 --model 70b --json > /dev/null
+          go run . --bandwidth 273 --mem 24 --model 8b > /dev/null
+          if go run . --model 8b > /dev/null 2>&1; then echo "expected failure without hardware"; exit 1; fi
