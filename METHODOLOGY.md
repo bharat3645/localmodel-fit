@@ -44,9 +44,13 @@ heuristic pointer, not a prediction.
 
 - **Prefill is not modeled.** Prompt processing is compute-bound and follows
   different math; figures here are steady-state generation only.
-- **MoE is not modeled.** Mixture-of-experts models read only active experts
-  per token; using total params underestimates their speed. Treat MoE
-  predictions as lower bounds or use active-param counts.
+- **MoE decode speed needs `--active-params`.** Mixture-of-experts models
+  read only the routed experts per token, not the full parameter count;
+  `--model` alone (as for a dense model) underestimates decode speed.
+  Passing `--active-params` alongside `--model` predicts decode from the
+  active count while still sizing memory footprint/fit from the total
+  count. There's no auto-detection from a model name yet - you supply both
+  numbers.
 - **Batch size 1.** Batched serving amortizes weight reads and changes the
   regime entirely.
 - **No CPU/GPU split.** Partial offload blends two bandwidth domains; not

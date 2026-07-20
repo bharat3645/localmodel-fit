@@ -92,6 +92,48 @@ func TestAdviseOrderingAndBest(t *testing.T) {
 	}
 }
 
+func TestAdviseMoEMatchesAdviseForDenseModel(t *testing.T) {
+	hw := Hardware{Name: "test", BandwidthGBs: 100, MemoryGB: 8}
+	dense := Advise(8e9, hw, 0.7)
+	moe := AdviseMoE(8e9, 8e9, hw, 0.7)
+	for i := range dense {
+		if dense[i] != moe[i] {
+			t.Fatalf("row %d: Advise=%+v AdviseMoE(total==active)=%+v", i, dense[i], moe[i])
+		}
+	}
+}
+
+func TestAdviseMoEUsesActiveParamsForDecodeAndTotalForFit(t *testing.T) {
+	// Mixtral-8x7B-shaped: 46.7B total (memory footprint), 12.9B active
+	// per token (decode speed) - using total params for decode speed would
+	// underestimate it, per the MoE limitation in METHODOLOGY.md.
+	hw := Hardware{Name: "test", BandwidthGBs: 273, MemoryGB: 64}
+	moe := AdviseMoE(46.7e9, 12.9e9, hw, 0.7)
+	dense := AdviseMoE(46.7e9, 46.7e9, hw, 0.7)
+	for i := range moe {
+		if moe[i].WeightGB != dense[i].WeightGB {
+			t.Fatalf("%s: memory footprint must come from total params regardless of active params: moe=%v dense=%v",
+				moe[i].Quant.Name, moe[i].WeightGB, dense[i].WeightGB)
+		}
+		if moe[i].Fits != dense[i].Fits {
+			t.Fatalf("%s: Fits must come from total params: moe=%v dense=%v", moe[i].Quant.Name, moe[i].Fits, dense[i].Fits)
+		}
+		if moe[i].DecodeTokS <= dense[i].DecodeTokS {
+			t.Fatalf("%s: active-param decode (%v) should be faster than total-param decode (%v)",
+				moe[i].Quant.Name, moe[i].DecodeTokS, dense[i].DecodeTokS)
+		}
+	}
+	// Q4_K_M active bytes = 12.9e9 * 4.85/8; decode = 273e9*0.7/that.
+	q4 := moe[0]
+	for _, r := range moe {
+		if r.Quant.Name == "Q4_K_M" {
+			q4 = r
+		}
+	}
+	wantDecode := DecodeTokS(273, WeightBytes(12.9e9, 4.85), 0.7)
+	almost(t, q4.DecodeTokS, wantDecode, 0.01)
+}
+
 func TestPresetsSane(t *testing.T) {
 	for key, hw := range HardwarePresets {
 		if hw.BandwidthGBs <= 0 || hw.MemoryGB <= 0 || hw.Name == "" {

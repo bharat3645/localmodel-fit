@@ -24,6 +24,7 @@ func run() error {
 	bandwidth := flag.Float64("bandwidth", 0, "peak memory bandwidth GB/s (overrides preset)")
 	mem := flag.Float64("mem", 0, "accelerator-visible memory GB (overrides preset)")
 	model := flag.String("model", "", "model parameter count, e.g. 8b, 70b, 350m")
+	activeModel := flag.String("active-params", "", "active parameter count per token, for MoE models (e.g. 12.9b for Mixtral-8x7B's 46.7b total); defaults to --model (dense)")
 	efficiency := flag.Float64("efficiency", fit.DefaultEfficiency, "achievable fraction of peak bandwidth")
 	jsonOut := flag.Bool("json", false, "JSON output")
 	listHW := flag.Bool("list-hw", false, "list hardware presets and exit")
@@ -58,16 +59,30 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	activeParams := params
+	isMoE := false
+	if *activeModel != "" {
+		activeParams, err = fit.ParseParams(*activeModel)
+		if err != nil {
+			return fmt.Errorf("--active-params: %w", err)
+		}
+		if activeParams > params {
+			return fmt.Errorf("--active-params (%s) cannot exceed --model (%s)", fit.HumanParams(activeParams), fit.HumanParams(params))
+		}
+		isMoE = true
+	}
 
-	results := fit.Advise(params, hw, *efficiency)
+	results := fit.AdviseMoE(params, activeParams, hw, *efficiency)
 	best, hasBest := fit.Best(results)
 
 	if *jsonOut {
 		doc := map[string]any{
-			"hardware":   hw,
-			"params":     params,
-			"efficiency": *efficiency,
-			"results":    results,
+			"hardware":      hw,
+			"params":        params,
+			"active_params": activeParams,
+			"moe":           isMoE,
+			"efficiency":    *efficiency,
+			"results":       results,
 		}
 		if hasBest {
 			doc["best"] = best
@@ -78,7 +93,11 @@ func run() error {
 	}
 
 	fmt.Printf("%s: %.1f GB/s peak, %.0f GB memory, efficiency %.2f\n", hw.Name, hw.BandwidthGBs, hw.MemoryGB, *efficiency)
-	fmt.Printf("model: %s parameters\n\n", fit.HumanParams(params))
+	if isMoE {
+		fmt.Printf("model: %s parameters total, %s active per token (MoE)\n\n", fit.HumanParams(params), fit.HumanParams(activeParams))
+	} else {
+		fmt.Printf("model: %s parameters\n\n", fit.HumanParams(params))
+	}
 	fmt.Printf("%-8s %11s %5s %12s\n", "QUANT", "WEIGHTS", "FITS", "DECODE")
 	for _, r := range results {
 		fitStr := "no"

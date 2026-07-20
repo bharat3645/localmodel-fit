@@ -34,6 +34,27 @@ Presets cover Apple M1-M4 tiers, RTX 3090/4090/5090, and dual-channel
 DDR4/DDR5. `--mem` overrides a preset's default capacity (Apple configs
 vary).
 
+### Mixture-of-Experts models
+
+Add `--active-params` to get correct decode predictions for MoE models:
+every expert stays resident in memory (so the fit/footprint check still
+uses `--model`'s total count), but only the routed subset is read per
+token, which is what actually bounds decode speed.
+
+```
+$ localmodel-fit --hw m2-ultra --model 46.7b --active-params 12.9b   # Mixtral-8x7B
+Apple M2 Ultra: 800.0 GB/s peak, 192 GB memory, efficiency 0.70
+model: 46.7B parameters total, 12.9B active per token (MoE)
+
+QUANT        WEIGHTS  FITS       DECODE
+F16         93.40 GB   yes      21.7 t/s
+...
+```
+
+Using the 46.7B total for decode speed too (as if it were dense) would
+underestimate it by ~3.6x here - the gap the roadmap's "MoE-aware
+predictions" item used to leave open.
+
 ## Why bandwidth?
 
 Decode reads ~all weights per generated token, so memory bandwidth — not
@@ -51,7 +72,6 @@ Measure before you buy.
 
 ## Roadmap
 
-- MoE-aware predictions (active-parameter counts)
 - Prefill (compute-bound) model
 - CI benchmark harness: measured vs predicted on known runners
 

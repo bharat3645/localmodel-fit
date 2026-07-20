@@ -69,17 +69,32 @@ type Result struct {
 // Rows are ordered best-quality-first (highest bits per weight). An
 // efficiency <= 0 selects DefaultEfficiency.
 func Advise(params float64, hw Hardware, efficiency float64) []Result {
+	return AdviseMoE(params, params, hw, efficiency)
+}
+
+// AdviseMoE is Advise for models whose resident memory footprint and
+// per-token decode cost differ, as in Mixture-of-Experts models: every
+// expert stays resident (drives Fits/WeightGB, from totalParams) but only
+// the routed subset is read per forward pass (drives DecodeTokS, from
+// activeParams). Using totalParams for both — what Advise does for dense
+// models — underestimates MoE decode speed, since it charges every token
+// for experts that pass never touched.
+//
+// Pass totalParams == activeParams for a dense model; that's exactly what
+// Advise does.
+func AdviseMoE(totalParams, activeParams float64, hw Hardware, efficiency float64) []Result {
 	if efficiency <= 0 {
 		efficiency = DefaultEfficiency
 	}
 	results := make([]Result, 0, len(Quants))
 	for _, q := range Quants {
-		wb := WeightBytes(params, q.BitsPerWeight)
+		totalBytes := WeightBytes(totalParams, q.BitsPerWeight)
+		activeBytes := WeightBytes(activeParams, q.BitsPerWeight)
 		results = append(results, Result{
 			Quant:      q,
-			WeightGB:   wb / 1e9,
-			Fits:       Fits(wb, hw.MemoryGB),
-			DecodeTokS: DecodeTokS(hw.BandwidthGBs, wb, efficiency),
+			WeightGB:   totalBytes / 1e9,
+			Fits:       Fits(totalBytes, hw.MemoryGB),
+			DecodeTokS: DecodeTokS(hw.BandwidthGBs, activeBytes, efficiency),
 		})
 	}
 	sort.Slice(results, func(i, j int) bool {
