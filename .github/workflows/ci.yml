@@ -28,4 +28,11 @@ jobs:
           go run . --hw m4-pro --model 8b
           go run . --hw rtx-4090 --model 70b --json > /dev/null
           go run . --bandwidth 273 --mem 24 --model 8b > /dev/null
+          # prefill + latency (preset with FP16 figure) and --flops override
+          go run . --hw m4 --model 1.5b --prompt-tokens 512 --gen-tokens 128 > /dev/null
+          go run . --hw ddr5-2ch --model 8b --flops 20 --prompt-tokens 256 --json > /dev/null
           if go run . --model 8b > /dev/null 2>&1; then echo "expected failure without hardware"; exit 1; fi
+      - name: benchmark harness smoke (offline, no ollama/download)
+        run: |
+          go run ./bench -response bench/testdata/qwen2.5-0.5b-response.json -hw m4 -params 494032768
+          go run ./bench -response bench/testdata/qwen2.5-0.5b-response.json -hw ddr5-2ch -params 494032768

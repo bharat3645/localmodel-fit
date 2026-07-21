@@ -139,6 +139,15 @@ func TestPresetsSane(t *testing.T) {
 		if hw.BandwidthGBs <= 0 || hw.MemoryGB <= 0 || hw.Name == "" {
 			t.Fatalf("preset %q is incomplete: %+v", key, hw)
 		}
+		// FP16TFLOPS is optional (0 = no figure, prefill unavailable), but when
+		// present it must be plausible (no consumer accelerator exceeds ~1 PFLOP
+		// FP16 dense).
+		if hw.FP16TFLOPS < 0 || hw.FP16TFLOPS > 1000 {
+			t.Fatalf("preset %q has implausible FP16TFLOPS %v", key, hw.FP16TFLOPS)
+		}
+		if got := hw.FP16FLOPS(); got != hw.FP16TFLOPS*1e12 {
+			t.Fatalf("preset %q FP16FLOPS()=%v, want %v", key, got, hw.FP16TFLOPS*1e12)
+		}
 	}
 	seen := map[float64]bool{}
 	for _, q := range Quants {

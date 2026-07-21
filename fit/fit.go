@@ -21,12 +21,23 @@ type Quant struct {
 	BitsPerWeight float64
 }
 
-// Hardware describes the memory system that bounds decode speed.
+// Hardware describes the memory system that bounds decode speed and the
+// compute throughput that bounds prefill speed.
 type Hardware struct {
 	Name         string
 	BandwidthGBs float64
 	MemoryGB     float64
+	// FP16TFLOPS is peak half-precision throughput in TFLOP/s, used for the
+	// (compute-bound) prefill prediction. It is 0 for presets whose vendor
+	// does not publish a usable FP16 figure; prefill prediction is then
+	// unavailable unless supplied with --flops. See METHODOLOGY.md for how
+	// each preset's figure was sourced (spec sheet vs derived).
+	FP16TFLOPS float64
 }
+
+// FP16FLOPS returns peak FP16 throughput in FLOP/s (not TFLOPS), or 0 if the
+// preset has no FP16 figure.
+func (h Hardware) FP16FLOPS() float64 { return h.FP16TFLOPS * 1e12 }
 
 // DefaultEfficiency is the fraction of peak bandwidth real decode loops
 // achieve in practice (see METHODOLOGY.md for the observed range).

@@ -3,6 +3,41 @@
 All notable changes to this project are documented here. The format is
 based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **Prefill (prompt-processing) model.** `fit.PrefillTokS`,
+  `fit.TTFTSeconds`, `fit.EndToEndSeconds`, and CLI flags `--flops`, `--mfu`,
+  `--prompt-tokens`, `--gen-tokens`. Prefill is compute-bound —
+  `tok/s = flops · mfu / (2 · params)` from the ~`2·N·P` forward-pass FLOP
+  count (Kaplan et al. 2020) — so the CLI now also reports prompt-processing
+  throughput, time-to-first-token, and end-to-end latency. Prefill is
+  quant-independent and, for MoE, scales with `--active-params` like decode.
+- **FP16 compute figures on every GPU preset** (`Hardware.FP16TFLOPS`,
+  `FP16FLOPS()`), sourced from primary specs and marked honestly in
+  METHODOLOGY.md: NVIDIA dense FP32-accumulate Tensor TFLOPS (Blackwell/Ada/
+  Ampere whitepapers); Apple M1–M4 with FP16 = FP32 rate (no 2× multiplier —
+  verified via metal-benchmarks + KTH arXiv:2502.05317). DDR/CPU presets carry
+  no figure and omit prefill unless `--flops` is given. `--list-hw` shows the
+  new column.
+- **`bench/` benchmark harness.** Measures real prefill/decode throughput via
+  ollama and compares against the predictions, reporting the machine's
+  achieved bandwidth-efficiency and compute-MFU. Live and offline
+  (`-response`) modes; pure analysis logic unit-tested against a recorded real
+  response so CI validates it with no ollama and no model download.
+  [bench/RESULTS.md](bench/RESULTS.md) records measured-vs-predicted on an M4:
+  prefill scales as `1/params` to within ~2%, achieved MFU is size-independent
+  (~0.83–0.86), and 1.5B decode is within ~10–15% of the default.
+
+### Changed
+
+- METHODOLOGY.md documents the prefill model, the compute/bandwidth regime
+  split, FP16 preset sourcing (with primary-source citations), and updated
+  limitations (attention N² and short-prompt caveats replace the old
+  "prefill not modeled" note). Default MFU is 0.5 (conservative screening
+  midpoint; see RESULTS).
+
 ## [0.1.0] - 2026-07-21
 
 Initial tagged release.

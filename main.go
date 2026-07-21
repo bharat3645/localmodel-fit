@@ -26,6 +26,10 @@ func run() error {
 	model := flag.String("model", "", "model parameter count, e.g. 8b, 70b, 350m")
 	activeModel := flag.String("active-params", "", "active parameter count per token, for MoE models (e.g. 12.9b for Mixtral-8x7B's 46.7b total); defaults to --model (dense)")
 	efficiency := flag.Float64("efficiency", fit.DefaultEfficiency, "achievable fraction of peak bandwidth")
+	mfu := flag.Float64("mfu", fit.DefaultMFU, "achievable fraction of peak compute (for prefill)")
+	flops := flag.Float64("flops", 0, "peak FP16 TFLOPS for prefill (overrides preset)")
+	promptTokens := flag.Float64("prompt-tokens", 0, "prompt length for time-to-first-token estimate")
+	genTokens := flag.Float64("gen-tokens", 0, "tokens to generate for end-to-end latency estimate")
 	jsonOut := flag.Bool("json", false, "JSON output")
 	listHW := flag.Bool("list-hw", false, "list hardware presets and exit")
 	flag.Parse()
@@ -48,6 +52,9 @@ func run() error {
 	}
 	if *mem > 0 {
 		hw.MemoryGB = *mem
+	}
+	if *flops > 0 {
+		hw.FP16TFLOPS = *flops
 	}
 	if hw.BandwidthGBs <= 0 || hw.MemoryGB <= 0 {
 		return fmt.Errorf("need --hw preset or explicit --bandwidth and --mem")
@@ -75,6 +82,10 @@ func run() error {
 	results := fit.AdviseMoE(params, activeParams, hw, *efficiency)
 	best, hasBest := fit.Best(results)
 
+	// Prefill is compute-bound and quant-independent: one number per model,
+	// available only when the hardware has an FP16 compute figure.
+	prefillTokS := fit.PrefillTokS(hw.FP16FLOPS(), activeParams, *mfu)
+
 	if *jsonOut {
 		doc := map[string]any{
 			"hardware":      hw,
@@ -86,6 +97,18 @@ func run() error {
 		}
 		if hasBest {
 			doc["best"] = best
+		}
+		if prefillTokS > 0 {
+			prefill := map[string]any{"mfu": *mfu, "prefill_tok_s": prefillTokS}
+			if *promptTokens > 0 {
+				prefill["prompt_tokens"] = *promptTokens
+				prefill["ttft_s"] = fit.TTFTSeconds(*promptTokens, prefillTokS)
+				if hasBest && *genTokens > 0 {
+					prefill["gen_tokens"] = *genTokens
+					prefill["end_to_end_s"] = fit.EndToEndSeconds(*promptTokens, *genTokens, prefillTokS, best.DecodeTokS)
+				}
+			}
+			doc["prefill"] = prefill
 		}
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
@@ -111,6 +134,21 @@ func run() error {
 	} else {
 		fmt.Printf("\nno quantization fits in %.0f GB: smaller model or more memory\n", hw.MemoryGB)
 	}
+
+	if prefillTokS > 0 {
+		fmt.Printf("\nprefill: %.0f tok/s prompt processing (compute-bound, MFU %.2f, quant-independent)\n", prefillTokS, *mfu)
+		if *promptTokens > 0 {
+			ttft := fit.TTFTSeconds(*promptTokens, prefillTokS)
+			fmt.Printf("  TTFT for a %.0f-token prompt: %.2f s\n", *promptTokens, ttft)
+			if hasBest && *genTokens > 0 {
+				e2e := fit.EndToEndSeconds(*promptTokens, *genTokens, prefillTokS, best.DecodeTokS)
+				fmt.Printf("  end-to-end for +%.0f generated tokens (%s decode): %.2f s\n", *genTokens, best.Quant.Name, e2e)
+			}
+		}
+	} else if hw.FP16TFLOPS == 0 {
+		fmt.Printf("\nprefill: no FP16 compute figure for this hardware — pass --flops <TFLOPS> for a prompt-processing estimate\n")
+	}
+
 	if params >= 7e9 {
 		fmt.Println("speculative decoding: pair a same-family draft model ~10-20x smaller; typical 1.3-2.0x decode speedup (heuristic, see METHODOLOGY.md)")
 	}
@@ -125,6 +163,10 @@ func printPresets() {
 	sort.Strings(names)
 	for _, name := range names {
 		p := fit.HardwarePresets[name]
-		fmt.Printf("%-10s %-18s %7.1f GB/s %5.0f GB\n", name, p.Name, p.BandwidthGBs, p.MemoryGB)
+		flops := "     —"
+		if p.FP16TFLOPS > 0 {
+			flops = fmt.Sprintf("%6.1f", p.FP16TFLOPS)
+		}
+		fmt.Printf("%-10s %-18s %7.1f GB/s %5.0f GB %s TFLOPS\n", name, p.Name, p.BandwidthGBs, p.MemoryGB, flops)
 	}
 }
