@@ -1,5 +1,7 @@
 # localmodel-fit
 
+[![CI](https://github.com/bharat3645/localmodel-fit/actions/workflows/ci.yml/badge.svg)](https://github.com/bharat3645/localmodel-fit/actions/workflows/ci.yml)
+
 Local-LLM performance advisor: given your hardware and a model size, predicts
 **decode** tokens/sec (memory-bandwidth-bound) and **prefill** tokens/sec plus
 time-to-first-token (compute-bound), shows which quantizations actually fit,
