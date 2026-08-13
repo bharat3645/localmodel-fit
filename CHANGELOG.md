@@ -7,6 +7,15 @@ based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- `main_test.go`: direct unit tests of the CLI entrypoint (flag parsing,
+  error paths, table/JSON output formatting) alongside the existing `fit/`
+  and `bench/` package tests. `run` now takes `(args []string, stdout
+  io.Writer)` instead of parsing the process-wide `flag.CommandLine` and
+  writing straight to `os.Stdout`, so tests can invoke it directly and
+  repeatedly with an isolated flag set — behavior for real invocations
+  (`main`) is unchanged.
+- README: an Installation section (`go install`, build-from-source, and
+  prebuilt release binaries) ahead of Usage.
 - **Prefill (prompt-processing) model.** `fit.PrefillTokS`,
   `fit.TTFTSeconds`, `fit.EndToEndSeconds`, and CLI flags `--flops`, `--mfu`,
   `--prompt-tokens`, `--gen-tokens`. Prefill is compute-bound —
@@ -40,7 +49,9 @@ based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.1.0] - 2026-07-21
 
-Initial tagged release.
+Initial tagged release. (Prebuilt binaries for darwin/linux/windows were
+built from this tag and attached to the GitHub release after the fact —
+the release originally shipped source-only.)
 
 ### Added
 

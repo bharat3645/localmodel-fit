@@ -28,6 +28,31 @@ best fit: F16 (16.00 GB), predicted 11.9 tok/s decode
 ("best" = highest-quality quant that fits; speed/quality trade-off is
 yours — the table shows the whole frontier.)
 
+## Installation
+
+Requires [Go](https://go.dev/dl/) 1.22+. No other dependencies.
+
+```
+go install github.com/bharat3645/localmodel-fit@latest
+```
+
+This builds a `localmodel-fit` binary into `$(go env GOPATH)/bin` — make
+sure that directory is on your `PATH`, then run `localmodel-fit --list-hw`
+to confirm it works.
+
+Or build from a local clone:
+
+```
+git clone https://github.com/bharat3645/localmodel-fit.git
+cd localmodel-fit
+go build -o localmodel-fit .
+./localmodel-fit --list-hw
+```
+
+Prebuilt binaries for common platforms are attached to each
+[release](https://github.com/bharat3645/localmodel-fit/releases), if you'd
+rather skip the Go toolchain entirely.
+
 ## Usage
 
     localmodel-fit --hw <preset> --model <8b|70b|350m> [--efficiency 0.7] [--json]
