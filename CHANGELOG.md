@@ -7,6 +7,10 @@ based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Real asciinema demo (`demo/localmodel-fit-demo.cast` + driver script
+  `demo/run_demo.sh`): dense-model quant/decode table, the MoE-aware
+  decode correction (~3.6x on Mixtral-8x7B), and prefill/TTFT/end-to-end
+  latency, all from the compiled binary. README gained a "Demo" section.
 - `main_test.go`: direct unit tests of the CLI entrypoint (flag parsing,
   error paths, table/JSON output formatting) alongside the existing `fit/`
   and `bench/` package tests. `run` now takes `(args []string, stdout
