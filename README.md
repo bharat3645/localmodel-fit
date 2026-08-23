@@ -53,6 +53,18 @@ Prebuilt binaries for common platforms are attached to each
 [release](https://github.com/bharat3645/localmodel-fit/releases), if you'd
 rather skip the Go toolchain entirely.
 
+## Demo
+
+[`demo/localmodel-fit-demo.cast`](demo/localmodel-fit-demo.cast) — a real
+recorded terminal session (`asciinema play demo/localmodel-fit-demo.cast`)
+built from the compiled binary, driven by
+[`demo/run_demo.sh`](demo/run_demo.sh): the dense-model quant/decode table,
+the MoE-aware correction (Mixtral-8x7B decode is undercounted ~3.6x if you
+don't tell the tool only 12.9B of its 46.7B parameters are active per
+token), and prefill/TTFT/end-to-end latency. No network access or `ollama`
+needed — the tool is a pure calculator, so the recording is reproducible
+offline from the committed hardware/quant tables.
+
 ## Usage
 
     localmodel-fit --hw <preset> --model <8b|70b|350m> [--efficiency 0.7] [--json]
